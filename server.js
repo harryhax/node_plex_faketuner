@@ -4,10 +4,8 @@ import fs from "fs";
 import { spawn } from "child_process";
 import { loadM3U } from "./m3uLoader.js";
 import { getSelected, saveSelected } from "./channelStore.js";
-
 import os from "os";
 import { startSSDP } from "./ssdp.js";
-
 
 const app = express();
 const PORT = 5004;
@@ -17,9 +15,6 @@ app.use(express.static("public"));
 
 let cachedChannels = [];
 let ffmpeg = null;
-
-const baseUrl = `http://${getLocalIp()}:5004`;
-startSSDP(baseUrl);
 
 function getLocalIp() {
   const nets = os.networkInterfaces();
@@ -70,7 +65,7 @@ app.post("/config", async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/load", async (req, res) => {
+app.post("/load", (req, res) => {
   res.json(cachedChannels);
 });
 
@@ -80,6 +75,8 @@ app.post("/save", (req, res) => {
 });
 
 app.get("/discover.json", (req, res) => {
+  const ip = getLocalIp();
+
   res.json({
     FriendlyName: "node_plex_faketuner",
     Manufacturer: "HarryLabs",
@@ -88,19 +85,20 @@ app.get("/discover.json", (req, res) => {
     FirmwareVersion: "20240101",
     DeviceID: "A1B2C3D4",
     DeviceAuth: "faketuner",
-    BaseURL: `http://${req.hostname}:${PORT}`,
+    BaseURL: `http://${ip}:${PORT}`,
     TunerCount: 1
   });
 });
 
 app.get("/lineup.json", (req, res) => {
+  const ip = getLocalIp();
   const channels = getSelected();
 
   res.json(
     channels.map((c, i) => ({
       GuideNumber: String(i + 1),
       GuideName: c.name,
-      URL: `http://${req.hostname}:${PORT}/stream/${i}`
+      URL: `http://${ip}:${PORT}/stream/${i}`
     }))
   );
 });
@@ -135,5 +133,10 @@ app.get("/stream/:id", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Fake tuner running on port http://localhost:${PORT}`);
+  const ip = getLocalIp();
+  const baseUrl = `http://${ip}:${PORT}`;
+
+  console.log(`Fake tuner running on ${baseUrl}`);
+
+  startSSDP(baseUrl);
 });
