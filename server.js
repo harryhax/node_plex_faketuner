@@ -106,19 +106,18 @@ app.post("/save", (req, res) => {
     res.status(500).end();
   }
 });
-
 app.get("/discover.json", (req, res) => {
   try {
     const ip = getLocalIp();
 
     res.json({
-      FriendlyName: "node_plex_faketuner",
-      Manufacturer: "HarryLabs",
+      FriendlyName: "HDHomeRun",
+      Manufacturer: "Silicondust",
       ModelNumber: "HDHR4-2US",
       FirmwareName: "hdhomerun",
-      FirmwareVersion: "20240101",
-      DeviceID: "A1B2C3D4",
-      DeviceAuth: "faketuner",
+      FirmwareVersion: "20200101",
+      DeviceID: "12345678",
+      DeviceAuth: "test",
       BaseURL: `http://${ip}:${PORT}`,
       TunerCount: 1
     });
@@ -127,6 +126,7 @@ app.get("/discover.json", (req, res) => {
     res.status(500).end();
   }
 });
+
 
 app.get("/lineup.json", (req, res) => {
   try {
@@ -180,31 +180,26 @@ app.get("/stream/:id", (req, res) => {
   }
 });
 
+
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 app.get("/device.xml", (req, res) => {
-  const ip = getLocalIp();
-
   res.type("application/xml");
-  res.send(`<?xml version="1.0"?>
-<root xmlns="urn:schemas-upnp-org:device-1-0">
-  <specVersion>
-    <major>1</major>
-    <minor>0</minor>
-  </specVersion>
-  <device>
-    <deviceType>urn:schemas-upnp-org:device:MediaServer:1</deviceType>
-    <friendlyName>HDHomeRun</friendlyName>
-    <manufacturer>Silicondust</manufacturer>
-    <manufacturerURL>https://www.silicondust.com</manufacturerURL>
-    <modelDescription>HDHomeRun</modelDescription>
-    <modelName>HDHomeRun</modelName>
-    <modelNumber>HDHR4-2US</modelNumber>
-    <serialNumber>12345678</serialNumber>
-    <UDN>uuid:HDHomeRun</UDN>
-  </device>
-</root>
-`);
-});
 
+  res.sendFile(
+    path.join(__dirname, "device.xml"),
+    err => {
+      if (err) {
+        console.error("device.xml send error:", err);
+        res.status(500).end();
+      }
+    }
+  );
+});
 
 app.listen(PORT, () => {
   try {
