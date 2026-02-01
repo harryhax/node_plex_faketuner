@@ -5,6 +5,10 @@ import { spawn } from "child_process";
 import { loadM3U } from "./m3uLoader.js";
 import { getSelected, saveSelected } from "./channelStore.js";
 
+import os from "os";
+import { startSSDP } from "./ssdp.js";
+
+
 const app = express();
 const PORT = 5004;
 
@@ -13,6 +17,23 @@ app.use(express.static("public"));
 
 let cachedChannels = [];
 let ffmpeg = null;
+
+const baseUrl = `http://${getLocalIp()}:5004`;
+startSSDP(baseUrl);
+
+function getLocalIp() {
+  const nets = os.networkInterfaces();
+
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === "IPv4" && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+
+  return "127.0.0.1";
+}
 
 async function refreshPlaylist() {
   if (!process.env.M3U_URL) return;
