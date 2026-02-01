@@ -180,6 +180,32 @@ app.get("/stream/:id", (req, res) => {
   }
 });
 
+app.get("/device.xml", (req, res) => {
+  const ip = getLocalIp();
+
+  res.type("application/xml");
+  res.send(`<?xml version="1.0"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+  <specVersion>
+    <major>1</major>
+    <minor>0</minor>
+  </specVersion>
+  <device>
+    <deviceType>urn:schemas-upnp-org:device:MediaServer:1</deviceType>
+    <friendlyName>HDHomeRun</friendlyName>
+    <manufacturer>Silicondust</manufacturer>
+    <manufacturerURL>https://www.silicondust.com</manufacturerURL>
+    <modelDescription>HDHomeRun</modelDescription>
+    <modelName>HDHomeRun</modelName>
+    <modelNumber>HDHR4-2US</modelNumber>
+    <serialNumber>12345678</serialNumber>
+    <UDN>uuid:HDHomeRun</UDN>
+  </device>
+</root>
+`);
+});
+
+
 app.listen(PORT, () => {
   try {
     const ip = getLocalIp();
