@@ -1,7 +1,10 @@
 import dgram from "dgram";
 
+const MULTICAST_ADDR = "239.255.255.250";
+const PORT = 1900;
+
 export function startSSDP(baseUrl) {
-  const socket = dgram.createSocket("udp4");
+  const socket = dgram.createSocket({ type: "udp4", reuseAddr: true });
 
   socket.on("error", err => {
     console.error("SSDP socket error:", err);
@@ -10,8 +13,24 @@ export function startSSDP(baseUrl) {
   socket.on("message", (msg, rinfo) => {
     const text = msg.toString();
 
-    if (!text.includes("M-SEARCH")) return;
-    if (!text.includes("ssdp:discover")) return;
+    if (!text.startsWith("M-SEARCH")) return;
+
+    const stLine = text
+      .split("\r\n")
+      .find(l => l.toUpperCase().startsWith("ST:"));
+
+    if (!stLine) return;
+
+    const st = stLine.split(":").slice(1).join(":").trim();
+
+    const validST = [
+      "ssdp:all",
+      "upnp:rootdevice",
+      "urn:schemas-upnp-org:device:Basic:1",
+      "urn:schemas-upnp-org:device:MediaServer:1"
+    ];
+
+    if (!validST.includes(st)) return;
 
     const response =
       "HTTP/1.1 200 OK\r\n" +
@@ -19,7 +38,7 @@ export function startSSDP(baseUrl) {
       "EXT:\r\n" +
       "LOCATION: " + baseUrl + "/device.xml\r\n" +
       "SERVER: Linux/3.10 UPnP/1.0 HDHomeRun/1.0\r\n" +
-      "ST: urn:schemas-upnp-org:device:MediaServer:1\r\n" +
+      "ST: " + st + "\r\n" +
       "USN: uuid:HDHomeRun\r\n\r\n";
 
     socket.send(
@@ -31,12 +50,8 @@ export function startSSDP(baseUrl) {
     );
   });
 
-  socket.bind(1900, () => {
-    try {
-      socket.addMembership("239.255.255.250");
-      console.log("SSDP discovery started");
-    } catch (err) {
-      console.error("SSDP multicast join failed:", err);
-    }
+  socket.bind(PORT, () => {
+    socket.addMembership(MULTICAST_ADDR);
+    console.log("SSDP discovery started");
   });
 }
