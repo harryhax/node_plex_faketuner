@@ -17,10 +17,10 @@ export function startSSDP(baseUrl) {
       "HTTP/1.1 200 OK\r\n" +
       "CACHE-CONTROL: max-age=1800\r\n" +
       "EXT:\r\n" +
-      "LOCATION: " + baseUrl + "/discover.json\r\n" +
-      "SERVER: node_plex_faketuner/0.0.1\r\n" +
+      "LOCATION: " + baseUrl + "/device.xml\r\n" +
+      "SERVER: Linux/3.10 UPnP/1.0 HDHomeRun/1.0\r\n" +
       "ST: urn:schemas-upnp-org:device:MediaServer:1\r\n" +
-      "USN: uuid:node-plex-faketuner\r\n\r\n";
+      "USN: uuid:HDHomeRun\r\n\r\n";
 
     socket.send(
       response,
