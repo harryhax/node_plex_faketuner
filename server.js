@@ -2,9 +2,10 @@ import "dotenv/config";
 import express from "express";
 import fs from "fs";
 import { spawn } from "child_process";
+import os from "os";
+
 import { loadM3U } from "./m3uLoader.js";
 import { getSelected, saveSelected } from "./channelStore.js";
-import os from "os";
 import { startSSDP } from "./ssdp.js";
 
 const app = express();
@@ -17,126 +18,177 @@ let cachedChannels = [];
 let ffmpeg = null;
 
 function getLocalIp() {
-  const nets = os.networkInterfaces();
+  try {
+    const nets = os.networkInterfaces();
 
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      if (net.family === "IPv4" && !net.internal) {
-        return net.address;
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        if (net.family === "IPv4" && !net.internal) {
+          return net.address;
+        }
       }
     }
+  } catch (err) {
+    console.error("getLocalIp error:", err);
   }
 
   return "127.0.0.1";
 }
 
 async function refreshPlaylist() {
-  if (!process.env.M3U_URL) return;
+  try {
+    if (!process.env.M3U_URL) return;
 
-  const channels = await loadM3U(process.env.M3U_URL);
-  cachedChannels = channels;
+    const channels = await loadM3U(process.env.M3U_URL);
+    cachedChannels = channels;
+  } catch (err) {
+    console.error("refreshPlaylist error:", err);
+  }
 }
 
-await refreshPlaylist();
+try {
+  await refreshPlaylist();
+} catch (err) {
+  console.error("Startup playlist load failed:", err);
+}
 
 app.get("/config", (req, res) => {
-  res.json({
-    m3uUrl: process.env.M3U_URL || ""
-  });
+  try {
+    res.json({
+      m3uUrl: process.env.M3U_URL || ""
+    });
+  } catch (err) {
+    console.error("/config GET error:", err);
+    res.status(500).end();
+  }
 });
 
 app.post("/config", async (req, res) => {
-  const url = req.body.url || "";
+  try {
+    const url = req.body.url || "";
 
-  const envLines = fs.existsSync(".env")
-    ? fs
-        .readFileSync(".env", "utf8")
-        .split("\n")
-        .filter(l => !l.startsWith("M3U_URL="))
-    : [];
+    const envLines = fs.existsSync(".env")
+      ? fs
+          .readFileSync(".env", "utf8")
+          .split("\n")
+          .filter(l => !l.startsWith("M3U_URL="))
+      : [];
 
-  envLines.push(`M3U_URL=${url}`);
-  fs.writeFileSync(".env", envLines.join("\n"));
+    envLines.push(`M3U_URL=${url}`);
+    fs.writeFileSync(".env", envLines.join("\n"));
 
-  process.env.M3U_URL = url;
+    process.env.M3U_URL = url;
 
-  await refreshPlaylist();
+    await refreshPlaylist();
 
-  res.json({ ok: true });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("/config POST error:", err);
+    res.status(500).end();
+  }
 });
 
 app.post("/load", (req, res) => {
-  res.json(cachedChannels);
+  try {
+    res.json(cachedChannels);
+  } catch (err) {
+    console.error("/load error:", err);
+    res.status(500).end();
+  }
 });
 
 app.post("/save", (req, res) => {
-  saveSelected(req.body);
-  res.json({ ok: true });
+  try {
+    saveSelected(req.body);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("/save error:", err);
+    res.status(500).end();
+  }
 });
 
 app.get("/discover.json", (req, res) => {
-  const ip = getLocalIp();
+  try {
+    const ip = getLocalIp();
 
-  res.json({
-    FriendlyName: "node_plex_faketuner",
-    Manufacturer: "HarryLabs",
-    ModelNumber: "HDHR4-2US",
-    FirmwareName: "hdhomerun",
-    FirmwareVersion: "20240101",
-    DeviceID: "A1B2C3D4",
-    DeviceAuth: "faketuner",
-    BaseURL: `http://${ip}:${PORT}`,
-    TunerCount: 1
-  });
+    res.json({
+      FriendlyName: "node_plex_faketuner",
+      Manufacturer: "HarryLabs",
+      ModelNumber: "HDHR4-2US",
+      FirmwareName: "hdhomerun",
+      FirmwareVersion: "20240101",
+      DeviceID: "A1B2C3D4",
+      DeviceAuth: "faketuner",
+      BaseURL: `http://${ip}:${PORT}`,
+      TunerCount: 1
+    });
+  } catch (err) {
+    console.error("/discover.json error:", err);
+    res.status(500).end();
+  }
 });
 
 app.get("/lineup.json", (req, res) => {
-  const ip = getLocalIp();
-  const channels = getSelected();
+  try {
+    const ip = getLocalIp();
+    const channels = getSelected();
 
-  res.json(
-    channels.map((c, i) => ({
-      GuideNumber: String(i + 1),
-      GuideName: c.name,
-      URL: `http://${ip}:${PORT}/stream/${i}`
-    }))
-  );
+    res.json(
+      channels.map((c, i) => ({
+        GuideNumber: String(i + 1),
+        GuideName: c.name,
+        URL: `http://${ip}:${PORT}/stream/${i}`
+      }))
+    );
+  } catch (err) {
+    console.error("/lineup.json error:", err);
+    res.status(500).end();
+  }
 });
 
 app.get("/stream/:id", (req, res) => {
-  const channels = getSelected();
-  const ch = channels[Number(req.params.id)];
+  try {
+    const channels = getSelected();
+    const ch = channels[Number(req.params.id)];
 
-  if (!ch) return res.end();
+    if (!ch) return res.end();
 
-  res.setHeader("Content-Type", "video/mp2t");
+    res.setHeader("Content-Type", "video/mp2t");
 
-  ffmpeg = spawn("ffmpeg", [
-    "-re",
-    "-i",
-    ch.url,
-    "-c",
-    "copy",
-    "-f",
-    "mpegts",
-    "pipe:1"
-  ]);
+    ffmpeg = spawn("ffmpeg", [
+      "-re",
+      "-i",
+      ch.url,
+      "-c",
+      "copy",
+      "-f",
+      "mpegts",
+      "pipe:1"
+    ]);
 
-  ffmpeg.stdout.pipe(res);
+    ffmpeg.stdout.pipe(res);
 
-  req.on("close", () => {
-    if (ffmpeg) {
-      ffmpeg.kill("SIGKILL");
-      ffmpeg = null;
-    }
-  });
+    req.on("close", () => {
+      if (ffmpeg) {
+        ffmpeg.kill("SIGKILL");
+        ffmpeg = null;
+      }
+    });
+  } catch (err) {
+    console.error("/stream error:", err);
+    res.status(500).end();
+  }
 });
 
 app.listen(PORT, () => {
-  const ip = getLocalIp();
-  const baseUrl = `http://${ip}:${PORT}`;
+  try {
+    const ip = getLocalIp();
+    const baseUrl = `http://${ip}:${PORT}`;
 
-  console.log(`Fake tuner running on ${baseUrl}`);
+    console.log(`Fake tuner running on ${baseUrl}`);
 
-  startSSDP(baseUrl);
+    startSSDP(baseUrl);
+  } catch (err) {
+    console.error("SSDP startup error:", err);
+  }
 });
